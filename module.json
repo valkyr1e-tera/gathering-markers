@@ -1,11 +1,14 @@
 {
     "disableAutoUpdate": false,
     "name": "gathering-markers",
-    "author": "teralove",
+    "author": "valkyr1e / teralove",
     "description": "Spawn item markers on gathering nodes and hide undesireable nodes.",
+    "version": "2.0",
     "options": {
-        "niceName": "Gathering Markers"
+        "niceName": "Gathering Markers",
+		"settingsVersion": 1,
+		"settingsFile": "config.json",
+		"settingsMigrator": "settings_migrator.js"
     },
-    "servers": ["https://raw.githubusercontent.com/teralove/gathering-markers/master/"],
-    "supportUrl": "https://github.com/teralove/gathering-markers/issues"
+    "servers": ["https://raw.githubusercontent.com/valkyr1e-tera/gathering-markers/master/"]
 }

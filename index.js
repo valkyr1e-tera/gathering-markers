@@ -1,117 +1,96 @@
-'use strict'
+const _ = require('lodash')
 
 module.exports = function GatheringMarkers(mod) {
-    const config = require('./config.json');
-    
-    let active = true,
-    enabled = true,
-    markenabled = true,
-    messager = false,
-    alerts = false,
-    Item_ID = 98260,
-    whiteList = [],
-    markList = [],
-    marks = [],
-    idMod = 2n;
-    
-    mod.hook('S_LOGIN', 10, (event) => {
-        configInit();
-    })
-    
-    mod.hook('S_SPAWN_COLLECTION', 4, (event) => {
-        if (!enabled || !active) return;
-        if (!whiteList.includes(event.id)) return false;
+  const herbs = [1, 2, 3, 4, 5, 6]
+  const mines = [101, 102, 103, 104, 105, 106]
+  const energies = [201, 202, 203, 204, 205, 206]
+  const gatheringTargets = _.concat(herbs, mines, energies)
 
-        if (markenabled) {   
-            if (markList.includes(event.id) && !marks.includes(event.gameId.toString())) {
-                spawnMark(event.gameId*idMod, event.loc);
-                marks.push(event.gameId.toString());
-            }
-        }
-        
-        if (alerts) notice('Found ' + event.id)
-        
-        if (messager) mod.command.message('Found ' + event.id)
-            
-    })
-        
-    mod.hook('S_DESPAWN_COLLECTION', 2, (event) => {
-        if (marks.includes(event.gameId.toString())) {
-            despawnMark(event.gameId*idMod)
-            marks.splice(marks.indexOf(event.gameId.toString()), 1);
-        }
-    })
-    
-	mod.hook('S_LOAD_TOPO', 3, event => {
-        active = event.zone < 9000;
-		marks = [];
-	})
+  const markers = []
 
-	function configInit() {
-        if (config) {
-            ({enabled,markenabled,messager,alerts,Item_ID,whiteList,markList} = config)
-        } else {
-            mod.command.message("Error: Unable to load config.json - Using default values for now");
-        }
-	}
-
-	function spawnMark(idRef, loc) {
-        loc.z -= 100;
-		mod.send('S_SPAWN_DROPITEM', 6, {
-			gameId: idRef,
-			loc: loc,
-			item: Item_ID, 
-			amount: 1,
-			expiry: 300000,
-			explode:false,
-			masterwork:false,
-			enchant:0,
-			source:0,
-			debug:false,
-			owners: [{id: 0}]
-		})
-	}
-	
-	function despawnMark(idRef) {
-		mod.send('S_DESPAWN_DROPITEM', 4, {
-			gameId: idRef
-		});
-	}    
-    
-	function notice(msg) {
-		mod.send('S_DUNGEON_EVENT_MESSAGE', 2, {
-            type: 43,
-            chat: false,
-            channel: 0,
-            message: msg
-        })
+  mod.command.add('gathering', {
+    $none() {
+      mod.settings.enabled = !mod.settings.enabled
+      mod.command.message(`${mod.settings.enabled ? 'en' : 'dis'}abled`)
+    },
+    add(id) {
+      id = Number(id)
+      let message
+      if (gatheringTargets.includes(id)) {
+        if (!mod.settings.markTargets.includes(id))
+          mod.settings.markTargets.push(id)
+        message = `added ${id} to marking target`
+      } else {
+        message = `${id} is out of range of marking targets`
+      }
+      mod.command.message(message)
+    },
+    remove(id) {
+      id = Number(id)
+      _.pull(mod.settings.markTargets, id)
+      mod.command.message(`removed ${id} from marking targets`)
+    },
+    clean() {
+      mod.settings.markTargets = []
+      mod.command.message('marking targets cleared')
+    },
+    $default(args) {
+      switch (args[0]) {
+        case 'herb':
+          mod.settings.markTargets = herbs
+          break
+        case 'mine':
+          mod.settings.markTargets = mines
+          break
+        case 'energy':
+          mod.settings.markTargets = energies
+          break
+        default:
+          return mod.command.message(`${args[0]} is invalid argument`)
+      }
     }
-    
-    mod.command.add('gathering', (p1)=> {
-        if (p1) p1 = p1.toLowerCase();
-        if (p1 == null) {
-            enabled = !enabled;
-        } else if (p1 === 'off') {
-            enabled = false;
-        } else if (p1 === 'on') {
-            enabled = true;
-        } else if (['alert', 'alerts'].includes(p1)) {
-			alerts = !alerts;
-			mod.command.message(alerts ? 'System popup notice enabled' : 'System popup notice disabled');
-            return;
-        } else if (['message', 'messages', 'proxy'].includes(p1)) {
-			messager = !messager;
-			mod.command.message(messager ? 'Proxy messages enabled' : 'Proxy messages disabled');
-            return;
-        } else if (['mark', 'marks', 'marker', 'markers'].includes(p1)) {
-			markenabled = !markenabled;
-			mod.command.message(markenabled ? 'Item Markers enabled' : 'Item Markers disabled');
-            return;
-        } else {
-            mod.command.message(p1 +' is an invalid argument');
-            return;
-        }        
-        mod.command.message(enabled ? 'Enabled' : 'Disabled');
-    });
+  })
 
+  mod.game.me.on('change_zone', clearMarkers)
+
+  mod.hook('S_SPAWN_COLLECTION', 4, event => {
+    if (!mod.settings.enabled || !mod.settings.markTargets.includes(event.id))
+      return
+
+    const id = event.gameId * 2n
+    spawnMarker(id, event.loc)
+  })
+
+  mod.hook('S_DESPAWN_COLLECTION', 2, event => {
+    const id = event.gameId * 2n
+    despawnMarker(id)
+  })
+
+  function spawnMarker(id, loc) {
+    if (markers.includes(id))
+      return
+
+    loc.z -= 100
+    mod.send('S_SPAWN_DROPITEM', 6, {
+      gameId: id,
+      loc,
+      item: 98260,
+      amount: 1,
+      expiry: 300000,
+      owners: [{ id: 0 }]
+    })
+    markers.push(id)
+  }
+
+  function despawnMarker(id) {
+    if (!markers.includes(id))
+      return
+
+    mod.send('S_DESPAWN_DROPITEM', 4, { gameId: id })
+    _.pull(markers, id)
+  }
+
+  function clearMarkers() {
+    markers.forEach(despawnMarker)
+  }
 }
