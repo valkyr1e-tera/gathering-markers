@@ -71,10 +71,10 @@ module.exports = function GatheringMarkers(mod) {
       return
 
     loc.z -= 100
-    mod.send('S_SPAWN_DROPITEM', 6, {
+    mod.send('S_SPAWN_DROPITEM', 7, {
       gameId: id,
       loc,
-      item: 98260,
+      item: 88716,
       amount: 1,
       expiry: 300000,
       owners: [{ id: 0 }]
